@@ -1,0 +1,9 @@
+
+*.PNG
+*.xml
+*.html
+*.doctree
+doc/.DS_Store
+doc/_build/html/.DS_Store
+*.pyc
+.DS_store
