@@ -10,7 +10,8 @@ font_size = 8
 
 params = {
     'axes.labelsize': font_size  * font_ratio,
-    'text.fontsize': font_size  * font_ratio,
+    # 'text.fontsize': font_size  * font_ratio,
+    'font.size': font_size  * font_ratio,
     'legend.fontsize': font_size  * font_ratio,
     'xtick.labelsize': font_size  * font_ratio,
     'ytick.labelsize': font_size  * font_ratio,

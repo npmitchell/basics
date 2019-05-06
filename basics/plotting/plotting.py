@@ -51,8 +51,34 @@ def set_fontsizes(sizes=None):
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
+def set_axes_radius(ax, origin, radius):
+    ax.set_xlim3d([origin[0] - radius, origin[0] + radius])
+    ax.set_ylim3d([origin[1] - radius, origin[1] + radius])
+    ax.set_zlim3d([origin[2] - radius, origin[2] + radius])
+
+
+def set_axes_equal(ax):
+    """Make axes of 3D plot have equal scale so that spheres appear as spheres,
+    cubes as cubes, etc..  This is one possible solution to Matplotlib's
+    ax.set_aspect('equal') and ax.axis('equal') not working for 3D.
+
+    Input
+      ax: a matplotlib axis, e.g., as output from plt.gca().
+    """
+    limits = np.array([
+        ax.get_xlim3d(),
+        ax.get_ylim3d(),
+        ax.get_zlim3d(),
+    ])
+
+    origin = np.mean(limits, axis=1)
+    radius = 0.5 * np.max(np.abs(limits[:, 1] - limits[:, 0]))
+    set_axes_radius(ax, origin, radius)
+
+
 def plot_pcolormesh_scalar(x, y, C, outpath, title, xlabel=None, ylabel=None, title2='', subtext='', subsubtext='',
-                           vmin='auto', vmax='auto', cmap="coolwarm", show=False, close=True, axis_on=True, FSFS=20):
+                           vmin='auto', vmax='auto', cmap="coolwarm", show=False, close=True, axis_on=True, FSFS=20,
+                           ax=None, zorder=None):
     """Save a single-panel plot of a scalar quantity C as colored pcolormesh
 
     Parameters
@@ -90,10 +116,14 @@ def plot_pcolormesh_scalar(x, y, C, outpath, title, xlabel=None, ylabel=None, ti
     if isinstance(vmax, str):
         vmax = np.nanmax(C)
 
-    plt.close('all')
-    fig, ax = plt.subplots(1, 1)
+    if ax is None:
+        plt.close('all')
+        fig, ax = plt.subplots(1, 1)
+    else:
+        fig = plt.gcf()
+
     # scatter scale (for color scale)
-    scsc = ax.pcolormesh(x, y, C, cmap=cmap, vmin=vmin, vmax=vmax)
+    scsc = ax.pcolormesh(x, y, C, cmap=cmap, vmin=vmin, vmax=vmax, zorder=zorder)
     ax.set_aspect('equal')
     if not axis_on:
         ax.axis('off')
@@ -110,12 +140,14 @@ def plot_pcolormesh_scalar(x, y, C, outpath, title, xlabel=None, ylabel=None, ti
     fig.text(0.5, 0.98, title2, horizontalalignment='center', verticalalignment='top')
 
     if outpath is not None and outpath != 'none':
-        print 'outputting matrix image to ', outpath
+        print('outputting matrix image to ', outpath)
         plt.savefig(outpath + '.png')
     if show:
         plt.show()
     if close:
         plt.close()
+    else:
+        return fig, ax
 
 
 def plot_real_matrix(M, name='', outpath=None, fig='auto', climv=None, cmap="coolwarm", show=False, close=True,
@@ -155,7 +187,7 @@ def plot_real_matrix(M, name='', outpath=None, fig='auto', climv=None, cmap="coo
     cbar.set_clim(climvs)
 
     if outpath is not None and outpath != 'none':
-        print 'outputting matrix image to ', outpath
+        print('outputting matrix image to ', outpath)
         plt.savefig(outpath + '.png')
     if show:
         plt.show()
@@ -218,7 +250,7 @@ def plot_complex_matrix(M, name='', outpath=None, fig='auto', climvs=[], show=Fa
     cbar2.set_clim(climv_real_lower, climv_real_upper)
 
     if outpath is not None and outpath != 'none':
-        print 'outputting complex matrix image to ', outpath
+        print('outputting complex matrix image to ', outpath)
         plt.savefig(outpath + '.png')
     if show:
         plt.show()
@@ -257,7 +289,7 @@ def empty_scalar_mappable(vmin, vmax, cmap):
     return sm
 
 
-def get_markerstyles(n):
+def get_markerstyles(n=None):
     """Get a list of n marker style keys for matplotlib marker='' arguments, in a nicely defined order (so bizarre
     markers appear only for large n).
     If n < 28 (which is the number of 'nice' build-in markers, meaning ones I deem reasonably suitable for a plot,
@@ -288,7 +320,9 @@ def get_markerstyles(n):
     #                 outsyms.append(key)
     #     return outsyms
 
-    if n > len(all_markers):
+    if n is None:
+        markerlist = all_markers
+    elif n > len(all_markers):
         markerlist = all_markers
         markerlist.append(all_markers[0:n - len(all_markers)])
     else:
@@ -402,7 +436,7 @@ def plot_pcolormesh(x, y, z, n, ax=None, cax=None, method='nearest', make_cbar=T
     pcm = ax.pcolormesh(X, Y, Z, cmap=cmap, vmin=vmin, vmax=vmax, alpha=alpha, zorder=zorder)
 
     if make_cbar:
-        print 'making colorbar in plot_pcolormesh()...'
+        print('making colorbar in plot_pcolormesh()...')
         cbar = plt.colorbar(pcm, cax=cax, orientation=cbar_orientation)
         if ticks is not None:
             cbar.set_ticks(ticks)
@@ -415,23 +449,23 @@ def plot_pcolormesh(x, y, z, n, ax=None, cax=None, method='nearest', make_cbar=T
                 cbar.set_label(cax_label, labelpad=cbar_labelpad, rotation=0, fontsize=fontsize)
 
     if title is not None:
-        print '\n\n\nplotting.plotting: Making title\n\n\n'
+        print('\n\n\nplotting.plotting: Making title\n\n\n')
         if title_axX is None and title_axY is None:
             ax.set_title(title, fontsize=fontsize)
         elif title_axX is None:
-            print 'plotting.plotting: placing title at custom Y position...'
+            print('plotting.plotting: placing title at custom Y position...')
             ax.text(0.5, title_axY, title,
                     horizontalalignment='center',
                     verticalalignment='center',
                     transform=ax.transAxes)
         elif title_axY is None:
-            print 'plotting.plotting: placing title at custom X position...'
+            print('plotting.plotting: placing title at custom X position...')
             ax.text(title_axX, 1.0, title,
                     horizontalalignment='center',
                     verticalalignment='bottom',
                     transform=ax.transAxes)
         else:
-            print 'plotting.plotting: placing title at custom XY position...'
+            print('plotting.plotting: placing title at custom XY position...')
             ax.text(title_axX, title_axY, title,
                     horizontalalignment='center',
                     verticalalignment='center',
@@ -457,7 +491,7 @@ def change_axes_geometry_stack(fig, ax, naxes):
             ax[ii].change_geometry(*geometry)
 
     for ii in np.arange(len(ax), naxes):
-        print 'adding axis ', ii
+        print('adding axis ', ii)
         fig.add_subplot(naxes, 1, ii + 1)
 
     ax = fig.axes
@@ -1023,14 +1057,14 @@ def initialize_nxmpanel_cbar_fig(nn, mm, Wfig=90., Hfig=None, x0frac=0.15, y0fra
             if cbar_placement in ['above_center']:
                 x0cbar = (Wfig - wcbar) * 0.5
             elif cbar_placement in ['above_right', 'default']:
-                print 'mm = ', mm
+                print('mm = ', mm)
                 x0cbar = x0 + (mm - 0.5) * ws - wcbar * 0.5 + (mm - 1) * hspace
     else:
         x0cbar = x0cbarfrac * Wfig
 
-    print 'x0cbarfrac = ', x0cbarfrac
+    print('x0cbarfrac = ', x0cbarfrac)
 
-    print 'leplt.nxm: orientation = ', orientation, '\ncbar_placement= ', cbar_placement
+    print('leplt.nxm: orientation = ', orientation, '\ncbar_placement= ', cbar_placement)
     if y0cbarfrac is None:
         if orientation == 'vertical':
             if cbar_placement in ['right_right', 'default']:
@@ -1039,10 +1073,10 @@ def initialize_nxmpanel_cbar_fig(nn, mm, Wfig=90., Hfig=None, x0frac=0.15, y0fra
                 y0cbar = y0 + (1. - hcbarfrac) * hs * 0.5
         elif orientation == 'horizontal':
             if cbar_placement in ['above_right', 'default']:
-                print 'nn = ', nn
+                print('nn = ', nn)
                 y0cbar = y0 + (nn - 1.) * vspace + (nn + 0.1) * hs
             elif cbar_placement in ['above_center']:
-                print 'leplt: placing cbar in center above subplots...'
+                print('leplt: placing cbar in center above subplots...')
                 y0cbar = y0 + (nn - 1.) * vspace + (nn + 0.1) * hs
             else:
                 y0cbar = y0 + (nn - 1.) * vspace + (nn + 0.1) * hs
@@ -1295,7 +1329,6 @@ def initialize_2panel_cbar_cent(Wfig=360, Hfig=270, fontsize=12, wsfrac=0.4, wss
               [x0, (Hfig - hs) * 0.5, ws, hs, ''],  # network and kitaev regions
               [Wfig - wss - x0, (Hfig - hss) * 0.5, wss, hss, '']  # plot for chern
           )]
-    print ''
     cbar_ax = [sps.axes_in_mm(x0, y0, width, height, label=part, label_params=label_params)
                for x0, y0, width, height, part in (
                    [x0 + (hs - wcbar) * 0.5, (Hfig + hs) * 0.5 + vspace, wcbar, hcbar, ''],  # left cbar above
@@ -1303,7 +1336,7 @@ def initialize_2panel_cbar_cent(Wfig=360, Hfig=270, fontsize=12, wsfrac=0.4, wss
                     (Hfig + hs) * 0.5 + vspace, wcbar, hcbar, '']  # right cbar
                )]
     for cax in cbar_ax:
-        print 'cax.get_position() = ', cax.get_position()
+        print('cax.get_position() = ', cax.get_position())
 
     return fig, ax, cbar_ax
 
@@ -1420,7 +1453,6 @@ def initialize_2panel_1cbar_centy(Wfig=360, Hfig=270, fontsize=12, wsfrac=0.4, w
               [x0, (Hfig - hs) * 0.5, ws, hs, ''],
               [x0 + ws + hspace, (Hfig - hss) * 0.5, wss, hss, '']  # right panel
           )]
-    print ''
     cbar_ax = sps.axes_in_mm(x0cbar, y0cbar, wcbar, hcbar, label='', label_params=label_params)
 
     return fig, ax, cbar_ax
@@ -1428,7 +1460,7 @@ def initialize_2panel_1cbar_centy(Wfig=360, Hfig=270, fontsize=12, wsfrac=0.4, w
 
 def initialize_axis_stack(n_ax, make_cbar=False, Wfig=90, Hfig=90, hfrac=None, wfrac=0.6, x0frac=None, y0frac=0.12,
                           vspace=5, hspace=5, fontsize=8, wcbar_frac=0.2, cbar_aratio=0.1, cbar_orientation='vertical',
-                          cbarspace=5, tspace=8):
+                          cbarspace=5, tspace=8, **kwargs):
     """Create a vertical stack of plots, and a colorbar if make_cbar is True
 
     Parameters
@@ -1475,7 +1507,7 @@ def initialize_axis_stack(n_ax, make_cbar=False, Wfig=90, Hfig=90, hfrac=None, w
         if make_cbar and cbar_orientation == 'horizontal':
             # colorbar is going on top, with space cbarspace
             hfrac -= float(cbarspace) / (float(Hfig) * float(n_ax))
-        print 'hfrac = ', hfrac
+        print('hfrac = ', hfrac)
     if x0frac is None:
         x0 = (1. - wfrac) * 0.5 * Wfig
     else:
@@ -1483,11 +1515,11 @@ def initialize_axis_stack(n_ax, make_cbar=False, Wfig=90, Hfig=90, hfrac=None, w
     y0 = y0frac * Hfig
     ws = wfrac * Wfig
     hs = hfrac * Hfig
-    print 'hs = ', hs
-    xywh_list = [[x0, y0 + (n_ax - 1 - ii) * (hs + vspace), ws, hs, ''] for ii in range(n_ax)]
+    print('hs = ', hs)
+    xywh_list = [[x0, y0 + (n_ax - 1 - ii) * (hs + vspace), ws, hs, None] for ii in range(n_ax)]
 
-    print 'xywh_list = ', xywh_list
-    ax = [sps.axes_in_mm(x0, y0, width, height, label=part, label_params=label_params)
+    print('xywh_list = ', xywh_list)
+    ax = [sps.axes_in_mm(x0, y0, width, height, label=part, label_params=label_params, **kwargs)
           for x0, y0, width, height, part in xywh_list]
 
     if make_cbar:
@@ -1495,7 +1527,7 @@ def initialize_axis_stack(n_ax, make_cbar=False, Wfig=90, Hfig=90, hfrac=None, w
         hcbar = cbar_aratio * wcbar
         if cbar_orientation == 'vertical':
             cbar_ax = sps.axes_in_mm(x0 + ws + hspace, (Hfig - wcbar) * 0.5, hcbar, wcbar, label='',
-                                     label_params=label_params)
+                                     label_params=label_params, **kwargs)
         elif cbar_orientation == 'horizontal':
             cbar_ax = sps.axes_in_mm(x0 + (ws - wcbar) * 0.5, y0 + n_ax * (hs + vspace) + cbarspace, wcbar, hcbar,
                                      label='', label_params=label_params)
@@ -1558,19 +1590,18 @@ def initialize_axis_doublestack(n_ax, make_cbar=False, Wfig=90, Hfig=90, hfrac=N
         if make_cbar:
             # colorbar is going on top, with space cbarspace
             hfrac -= float(cbarspace) / (float(Hfig) * float(n_ax))
-        print 'hfrac = ', hfrac
+
     if x0frac is None:
         x0 = (1. - 2. * wfrac - float(hspace) / float(Wfig)) * 0.5 * Wfig
     else:
         x0 = x0frac * Wfig
-    print 'x0 = ', x0
+
     y0 = y0frac * Hfig
     ws = wfrac * Wfig
     hs = hfrac * Hfig
     xywh_list = [[x0, y0 + (n_ax - 1 - ii) * (hs + vspace), ws, hs, ''] for ii in range(n_ax)]
     xywh2_list = [[x0 + ws + hspace, y0 + (n_ax - 1 - ii) * (hs + vspace), ws, hs, ''] for ii in range(n_ax)]
 
-    print 'xywh_list = ', xywh_list
     ax = [sps.axes_in_mm(x, y, width, height, label=part, label_params=label_params)
           for x, y, width, height, part in xywh_list]
     ax += [sps.axes_in_mm(x, y, width, height, label=part, label_params=label_params)
@@ -1578,9 +1609,6 @@ def initialize_axis_doublestack(n_ax, make_cbar=False, Wfig=90, Hfig=90, hfrac=N
     if make_cbar:
         wcbar = Wfig * wcbar_frac
         hcbar = cbar_aratio * wcbar
-        print 'wcbar = ', wcbar
-        print 'x0 = ', x0
-        print 'ws = ', ws
         cbar_ax = [sps.axes_in_mm(x0 + (ws - wcbar) * 0.5, y0 + n_ax * (hs + vspace) + cbarspace, wcbar,
                                   hcbar, label='', label_params=label_params),
                    sps.axes_in_mm(x0 + (3. * ws - wcbar) * 0.5 + hspace, y0 + n_ax * (hs + vspace) + cbarspace, wcbar,
@@ -1644,19 +1672,18 @@ def initialize_insetaxis_doublestack(n_ax, make_cbar=False, Wfig=90, Hfig=90, hf
         if make_cbar:
             # colorbar is going on top, with space cbarspace
             hfrac -= float(cbarspace) / (float(Hfig) * float(n_ax))
-        print 'hfrac = ', hfrac
+
     if x0frac is None:
         x0 = (1. - 2. * wfrac - float(hspace) / float(Wfig)) * 0.5 * Wfig
     else:
         x0 = x0frac * Wfig
-    print 'x0 = ', x0
+
     y0 = y0frac * Hfig
     ws = wfrac * Wfig
     hs = hfrac * Hfig
     xywh_list = [[x0, y0 + (n_ax - 1 - ii) * (hs + vspace), ws, hs, ''] for ii in range(n_ax)]
     xywh2_list = [[x0 + ws + hspace, y0 + (n_ax - 1 - ii) * (hs + vspace), ws, hs, ''] for ii in range(n_ax)]
 
-    print 'xywh_list = ', xywh_list
     ax = [sps.axes_in_mm(x, y, width, height, label=part, label_params=label_params)
           for x, y, width, height, part in xywh_list]
     ax += [sps.axes_in_mm(x, y, width, height, label=part, label_params=label_params)
@@ -1664,9 +1691,6 @@ def initialize_insetaxis_doublestack(n_ax, make_cbar=False, Wfig=90, Hfig=90, hf
     if make_cbar:
         wcbar = Wfig * wcbar_frac
         hcbar = cbar_aratio * wcbar
-        print 'wcbar = ', wcbar
-        print 'x0 = ', x0
-        print 'ws = ', ws
         cbar_ax = [sps.axes_in_mm(x0 + (ws - wcbar) * 0.5, y0 + n_ax * (hs + vspace) + cbarspace, wcbar,
                                   hcbar, label='', label_params=label_params),
                    sps.axes_in_mm(x0 + (3. * ws - wcbar) * 0.5 + hspace, y0 + n_ax * (hs + vspace) + cbarspace, wcbar,

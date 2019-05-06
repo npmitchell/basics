@@ -2,6 +2,7 @@ import os
 import shutil
 import glob
 import numpy as np
+import subprocess
 
 
 '''General use functions for input/output of data and files.
@@ -22,8 +23,9 @@ def ensure_dir(f):
     """
     d = os.path.dirname(f)
     if not os.path.exists(d):
-        print 'le.ensure_dir: creating dir: ', d
+        print('le.ensure_dir: creating dir: ', d)
         os.makedirs(d)
+    return prepdir(d)
 
 
 def find_dir_with_name(name, searchdir):
@@ -108,12 +110,12 @@ def find_subdirs(string, maindir):
         The directory in which to search for the subdirectory.
     """
     maindir = prepdir(maindir)
-    print 'dio: searching for ' + maindir + string
+    print('dio: searching for ' + maindir + string)
     contents = sorted(glob.glob(maindir + string))
     is_subdir = [os.path.isdir(ii) for ii in contents]
 
     if len(is_subdir) == 0:
-        print 'WARNING! Found no matching subdirectory: returning empty list'
+        print('WARNING! Found no matching subdirectory: returning empty list')
         return is_subdir
     else:
         subdirs = [prepdir(contents[ii]) for ii in np.where(is_subdir)[0].tolist()]
@@ -132,7 +134,7 @@ def find_subsubdirectory(string, maindir):
     is_subdir = [os.path.isdir(ii) for ii in contents]
 
     if len(is_subdir) == 0:
-        print 'WARNING! Found no matching subdirectory: returning empty list'
+        print('WARNING! Found no matching subdirectory: returning empty list')
         return is_subdir, is_subdir
     else:
         # print 'contents = ', contents
@@ -261,3 +263,14 @@ def remove(path):
         raise ValueError("file {} is not a file or dir.".format(path))
 
 
+def copy_file(fn, outfn):
+    """Copy a file from one place to another
+
+    Parameters
+    ----------
+    fn : str
+        The file or folder to copy
+    outfn : str
+        The output filename
+    """
+    subprocess.call(['cp', fn, outfn])

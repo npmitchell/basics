@@ -15,13 +15,37 @@ import matplotlib.pyplot as plt
 try:
     import seaborn.apionly as sns
 except:
-    print 'WARNING: Could not import seaborn; lepm.colormaps functionality is limited.'
-from matplotlib.colors import LinearSegmentedColormap
+    import seaborn.apionly as sns
+    print('basics.colormaps: WARNING - could not import seaborn; lepm.colormaps functionality is limited.')
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from scipy import interpolate
 import numpy as np
 
 
-def colormap_from_hex(hex_color='80D080', reverse=False):
+def listed_colormap(clist):
+    """Create discrete colormap from the list of colors in clist
+
+    Parameters
+    ----------
+    clist : list of colors
+
+    Returns
+    -------
+    cmap : discrete colormap
+    """
+    cmap = ListedColormap(clist)
+    return cmap
+
+
+def get_colors(ncolors=10):
+    """Return each of ncolors colors in default matplotlib color cycle"""
+    colors = np.array(['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink',
+                       'tab:gray', 'tab:olive', 'tab:cyan'])
+    inds = np.mod(np.arange(ncolors, dtype=int), len(colors))
+    return colors[inds]
+
+
+def colormap_from_hex(hex_color='80D080', reverse=False, black=False):
     """Create a colormap that varies from white to a specified color (hexadecimal specifier)
 
     Parameters
@@ -33,23 +57,85 @@ def colormap_from_hex(hex_color='80D080', reverse=False):
         hex_color = hex_color[1:]
     rgb = hex2rgbdecimal(hex_color)
     if reverse:
+        if black:
+            cdict = {'red': ((0.0, rgb[0], rgb[0]),
+                             (1.0, 0.0, 0.0)),
+
+                     'green': ((0.0, rgb[1], rgb[1]),
+                               (1.0, 0.0, 0.0)),
+
+                     'blue': ((0.0, rgb[2], rgb[2]),
+                              (1.0, 0.0, 0.0))
+                     }
+        else:
+            cdict = {'red': ((0.0, rgb[0], rgb[0]),
+                             (1.0, 1.0, 1.0)),
+
+                     'green': ((0.0, rgb[1], rgb[1]),
+                               (1.0, 1.0, 1.0)),
+
+                     'blue': ((0.0, rgb[2], rgb[2]),
+                              (1.0, 1.0, 1.0))
+                     }
+    else:
+        if black:
+            cdict = {'red': ((0.0, 0.0, 0.0),
+                             (1.0, rgb[0], rgb[0])),
+
+                     'green': ((0.0, 0.0, 0.0),
+                               (1.0, rgb[1], rgb[1])),
+
+                     'blue': ((0.0, 0.0, 0.0),
+                              (1.0, rgb[2], rgb[2]))
+                     }
+        else:
+            cdict = {'red': ((0.0, 1.0, 1.0),
+                             (1.0, rgb[0], rgb[0])),
+
+                     'green': ((0.0, 1.0, 1.0),
+                               (1.0, rgb[1], rgb[1])),
+
+                     'blue': ((0.0, 1.0, 1.0),
+                              (1.0, rgb[2], rgb[2]))
+                     }
+    colormap = LinearSegmentedColormap('hexmap', cdict)
+    return colormap
+
+
+def colormap_darken_hex(hex_color='80D080', reverse=False, darken=0.5):
+    """Create a colormap that varies from a specified color to a darker shade of the same color (hexadecimal specifier)
+
+    Parameters
+    ----------
+    hex_color : str (default='80D080')
+        Hexadecimal string specifier
+    darken : float
+        how much to darken the hexcolor in the cmap: darken=0 corresponds to
+        colormap_from_hex(hex_color, reverse=True, black=True). darken=1 means a uniform, single color colormap
+    reverse : bool
+        flip the direction of the colormap
+    """
+    if hex_color[0] == '#':
+        hex_color = hex_color[1:]
+    rgb = hex2rgbdecimal(hex_color)
+    if not reverse:
         cdict = {'red': ((0.0, rgb[0], rgb[0]),
-                         (1.0, 1.0, 1.0)),
+                         (1.0, darken * rgb[0], darken * rgb[0])),
 
                  'green': ((0.0, rgb[1], rgb[1]),
-                           (1.0, 1.0, 1.0)),
+                           (1.0, darken * rgb[1], darken * rgb[1])),
 
                  'blue': ((0.0, rgb[2], rgb[2]),
-                          (1.0, 1.0, 1.0))
+                          (1.0, darken * rgb[2], darken * rgb[2]))
                  }
     else:
-        cdict = {'red': ((0.0, 1.0, 1.0),
+        cdict = {'red': ((0.0, darken * rgb[0], darken * rgb[0]),
                          (1.0, rgb[0], rgb[0])),
 
-                 'green': ((0.0, 1.0, 1.0),
+                 'green': ((0.0, darken * rgb[1], darken * rgb[1]),
                            (1.0, rgb[1], rgb[1])),
 
-                 'blue': ((0.0, 1.0, 1.0),
+                 'blue': ((0.0, darken * rgb[2], darken * rgb[2]),
                           (1.0, rgb[2], rgb[2]))
                  }
     colormap = LinearSegmentedColormap('hexmap', cdict)
@@ -189,6 +275,13 @@ def hex2rgb(triplet):
         Red, green, and blue values between 0 and 255
     """
     return _HEXDEC[triplet[0:2]], _HEXDEC[triplet[2:4]], _HEXDEC[triplet[4:6]]
+
+
+def rgb2hex(triplet, range0to1=True):
+    '''Convert a tuple or list of three ints to a hexcode'''
+    if range0to1:
+        triplet = (triplet[0] * 255, triplet[1] * 255, triplet[2] * 255)
+    return '%02x%02x%02x' % (int(triplet[0]), int(triplet[1]), int(triplet[2]))
 
 
 def hex2rgbdecimal(hex_color):
@@ -364,7 +457,7 @@ def diverging_gray_husl_cmap(h_neg, h_pos, s=75, l=50, sep=20, grayvalue=0.5):
     # Create diverging colormap with gray in center
     # First get endpoints and convert them to rgb
     tmp = diverging_cmap(h_neg, h_pos, s=s, l=l, sep=sep, n=2)
-    print 'tmp = ', tmp
+    print('tmp = ', tmp)
     rgb0 = tmp(0.)
     rgb1 = tmp(255.)
     # Add linear segmented colormaps to dict cmaps
@@ -391,15 +484,98 @@ def colorcycle(num):
 
 
 def color_palette(name, **kwargs):
-    """Wrapper for seaborn's color_palette() function
+    """Wrapper for seaborn's color_palette() function.
+    Return a list of colors defining a color palette.
+
+    Availible seaborn palette names:
+        deep, muted, bright, pastel, dark, colorblind
+
+    Other options:
+        hls, husl, any named matplotlib palette, list of colors
+
+    Calling this function with ``palette=None`` will return the current
+    matplotlib color cycle.
+
+    Matplotlib paletes can be specified as reversed palettes by appending
+    "_r" to the name or as dark palettes by appending "_d" to the name.
+    (These options are mutually exclusive, but the resulting list of colors
+    can also be reversed).
+
+    This function can also be used in a ``with`` statement to temporarily
+    set the color cycle for a plot or set of plots.
 
     Parameters
     ----------
-    name
-    kwargs
+    palette: None, string, or sequence, optional
+        Name of palette or None to return current palette. If a sequence, input
+        colors are used but possibly cycled and desaturated.
+    n_colors : int, optional
+        Number of colors in the palette. If ``None``, the default will depend
+        on how ``palette`` is specified. Named palettes default to 6 colors,
+        but grabbing the current palette or passing in a list of colors will
+        not change the number of colors unless this is specified. Asking for
+        more colors than exist in the palette will cause it to cycle.
+    desat : float, optional
+        Proportion to desaturate each color by.
 
     Returns
     -------
+    palette : list of RGB tuples.
+        Color palette. Behaves like a list, but can be used as a context
+        manager and possesses an ``as_hex`` method to convert to hex color
+        codes.
+
+    See Also
+    --------
+    set_palette : Set the default color cycle for all plots.
+    set_color_codes : Reassign color codes like ``"b"``, ``"g"``, etc. to
+                      colors from one of the seaborn palettes.
+
+    Examples
+    --------
+
+    Show one of the "seaborn palettes", which have the same basic order of hues
+    as the default matplotlib color cycle but more attractive colors.
+
+    .. plot::
+        :context: close-figs
+
+        >>> import seaborn as sns; sns.set()
+        >>> sns.palplot(sns.color_palette("muted"))
+
+    Use discrete values from one of the built-in matplotlib colormaps.
+
+    .. plot::
+        :context: close-figs
+
+        >>> sns.palplot(sns.color_palette("RdBu", n_colors=7))
+
+    Make a "dark" matplotlib sequential palette variant. (This can be good
+    when coloring multiple lines or points that correspond to an ordered
+    variable, where you don't want the lightest lines to be invisible).
+
+    .. plot::
+        :context: close-figs
+
+        >>> sns.palplot(sns.color_palette("Blues_d"))
+
+    Use a categorical matplotlib palette, add some desaturation. (This can be
+    good when making plots with large patches, which look best with dimmer
+    colors).
+
+    .. plot::
+        :context: close-figs
+
+        >>> sns.palplot(sns.color_palette("Set1", n_colors=8, desat=.5))
+
+    Use as a context manager:
+
+    .. plot::
+        :context: close-figs
+
+        >>> import numpy as np, matplotlib.pyplot as plt
+        >>> with sns.color_palette("husl", 8):
+        ...    _ = plt.plot(np.c_[np.zeros(8), np.arange(8)].T)
 
     """
     return sns.color_palette(name, **kwargs)
@@ -1607,7 +1783,7 @@ rbb0 = diverging_cmap(10, 250, l=50, s=75, center='dark')
 cmaps['rbb0'] = rbb0
 bbr0 = diverging_cmap(250, 10, l=50, s=75, center='dark')
 cmaps['bbr0'] = bbr0
-# Create 5 color colormap with purple, blue, black, red, orange -- all perceptually uniform
+# Create 5 color colormap with green, blue, black, red, orange -- all perceptually uniform
 cmaps['gbbro'] = gbbro_cmap(l=50)
 # make purple, blue, black, red, orange colors
 cmaps['pbbro'] = pbbro_cmap(l=50)
@@ -1695,7 +1871,7 @@ def register_colormaps(cmaps=cmaps):
     for cmap_name in cmaps:
         if cmap_name not in plt.colormaps():
             if cmap_name == 'isolum_rainbow':
-                print 'registering isolum_rainbow...'
+                print('registering isolum_rainbow...')
                 plt.register_cmap(cmap=isolum_rainbow)
             else:
                 plt.register_cmap(name=cmap_name, cmap=cmaps[cmap_name])
@@ -1722,17 +1898,35 @@ def ensure_cmap(cmap_name, cmap=None):
 
     """
     if cmap is None:
-        cmap = le_cmaps[cmap_name]
+        if cmap_name in plt.colormaps():
+            cmap = plt.get_cmap(cmap_name)
+        elif ('u' + cmap_name) in plt.colormaps():
+            cmap = plt.get_cmap('u' + cmap_name)
+        else:
+            try:
+                cmap = le_cmaps[cmap_name]
+            except KeyError:
+                cmap_list = [key for key in le_cmaps] + plt.colormaps()
+                msg = 'Could not get colormap: ' + cmap_name + '. '
+                msg += 'Possible cmaps are: ' + str(cmap_list)
+                raise RuntimeError(msg)
 
     # If the colormap_name is not already in the list of registered colormaps, register it here
     if cmap_name not in plt.colormaps():
         plt.register_cmap(name=cmap_name, cmap=cmap)
+        cmap = plt.get_cmap(cmap_name)
+
     return cmap
 
 
 def green():
     """Return a pleasing shade of green in hexadecimal"""
     return '#557355'
+
+
+def light_green():
+    """Return a pleasing shade of green in hexadecimal"""
+    return '#93c393'
 
 
 def violet():
@@ -1784,6 +1978,13 @@ def orange():
     """Return a pleasing shade of orange in hexadecimal"""
     return '#FF7F0E'
 
+def orange_default():
+    """Return the default shade of orange in hexadecimal"""
+    return '#FD690F'
+
+def light_orange():
+    """Return a brighter, less saturated version of orange_default(), which is FD690F"""
+    return '#FFCA94'
 
 def honey():
     """Return a soft shade of yellowish brown in hexadecimal"""

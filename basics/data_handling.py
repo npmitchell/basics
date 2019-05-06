@@ -1,11 +1,12 @@
 import numpy as np
 import matplotlib.path as mplpath
 import copy
+from scipy.spatial import cKDTree
 
 try:
     import scipy.interpolate as interpolate
 except:
-    print 'Could not import scipy.interpolate!'
+    print('Could not import scipy.interpolate!')
 
 '''
 Description
@@ -70,9 +71,15 @@ def argmaxn(arr, num_vals):
     return arr.argsort()[-num_vals:][::-1]
 
 
+def contiguous(data, stepsize=1):
+    """Mirrors consecutive(), included in case user forgot what function is called"""
+    return consecutive(data, stepsize=stepsize)
+
+
 def consecutive(data, stepsize=1):
     """Split data into chunks in which each chunck is increasing by stepsize.
     This allows to search for consecutive data chunks that are changing by a fixed amount.
+    This is also related to np.contiguous()
 
     Parameters
     ----------
@@ -80,6 +87,11 @@ def consecutive(data, stepsize=1):
         data to be split
     stepsize : float or int
         The increment that each chunck should be increasing by
+
+    Returns
+    -------
+    output: list of data sequences
+        each element of the output contains contiguous chunks of the input data
     """
     return np.split(data, np.where(np.diff(data) != stepsize)[0] + 1)
 
@@ -252,8 +264,8 @@ def binstats_extravariable(arr, bin0col=0, bin1col=1, tol=1e-7):
             minvs = np.vstack((minvs, mins))
             maxvs = np.vstack((maxvs, maxs))
             stdvs = np.vstack((stdvs, stds))
-            print 'cntvs = ', cntvs
-            print 'count = ', count
+            # print 'cntvs = ', cntvs
+            # print 'count = ', count
             cntvs = np.hstack((np.array(cntvs).ravel(), np.array(count).ravel()))
             bin0v = np.hstack((bin0v, bin0val * np.ones(len(mins))))
         ii += 1
@@ -495,6 +507,7 @@ def unique_rows(a):
     """
     return np.array(list(set(tuple(p) for p in a)))
 
+
 def unique_threshold(a, thres):
     """Clean up an array such that all its elements are at least 'thres' different in value.
     See also unique_rows_threshold() for a generalization to 2D.
@@ -688,15 +701,25 @@ def nearest_local_maximum(xarr, yarr, value, thres=None, npeaks=None):
     return inds[ind]
 
 
-def find_peaks(arr, thres=None, npeaks=None):
-    """
+def find_peaks(arr, xdata=None, thres=None, thres_curvature=None, normalize_for_curv=False, npeaks=None):
+    """Identify local maxima in a 1d curve/array of data
 
     Parameters
     ----------
     arr : n x 1 float array
         Some intensity data in order of some parameter, to be searched for local maxima
+    xdata :  n x 1 float array or None (optional, if thres_curvature is nonzero and unequally spaced data)
+        The x data associated with the y data of arr. This is ONLY used if thres_curvature is not None -- ie, if there
+        is thresholding in the magnitude of curvature to find a peak. This would exclude broad/short peaks
     thres : float (0-1) or None for no thresholding
         The threshold intensity as a fraction of the maximum
+    thres_curvature : positive definite float or None for no curvature thresholding
+        The absolute threshold curvature of the curve. The magnitude (np.abs()) of the curvature is considered, and
+        corrections from the first derivative of the curve are neglected at the maximum. This means that we assume that
+        the data is finely spaced enough that the identified peaks are very near the true local maxima.
+    normalize_for_curv : bool
+        whether to have the curvature be computed for the normalized signal, normalized such that the maximum intensity
+        (positive or negative) is 1.0
     npeaks : int or None
         If not None, only keep the npeaks biggest peaks
 
@@ -709,14 +732,34 @@ def find_peaks(arr, thres=None, npeaks=None):
     # inds = np.r_[True, arr[1:] > arr[:-1]] & np.r_[arr[:-1] < arr[1:], True]
 
     # keep only the npeaks biggest peaks
-    if npeaks is not None:
-        inds2 = arr[inds].argsort()[-npeaks:][::-1]
-        inds = inds[inds2]
+    if npeaks is not None and npeaks > 0:
+        inds = arr[inds].argsort()[-npeaks:][::-1]
 
     # perform thresholding
     if thres is not None:
-        inds2 == np.where(arr[inds] > thres * np.max(arr))
-        inds = inds[inds2]
+        tmp = np.where(arr[inds] > thres * np.max(arr))
+        inds = inds[tmp]
+
+    if thres_curvature is not None:
+        # Note that curvature of a 1d curve is kappa = |f"(x) | / (1 + f'(x) **2 ) ** (3/2)
+        # At the identified local maximum, the first derivative is approximately zero, so we neglect this correction
+        if normalize_for_curv:
+            # Note: avoid in-place redefinition here
+            arr = arr / np.max(np.abs(arr))
+
+        if xdata is not None:
+            kappa = np.abs(np.gradient(xdata, np.gradient(xdata, arr)))
+        else:
+            kappa = np.gradient(np.gradient(arr))
+
+        # Check it
+        # import matplotlib.pyplot as plt
+        # print 'kappa = ', kappa
+        # plt.clf()
+        # plt.plot(np.arange(len(kappa)), kappa, 'r-')
+        # plt.show()
+
+        inds = inds[np.where(kappa[inds] < -thres_curvature)[0]]
 
     return inds
 
@@ -756,16 +799,16 @@ def smooth(x, window_len=11, window='hanning'):
     instead of just y.
     """
     if x.ndim != 1:
-        raise ValueError, "smooth only accepts 1 dimension arrays."
+        raise ValueError("smooth only accepts 1 dimension arrays.")
 
     if x.size < window_len:
-        raise ValueError, "Input vector needs to be bigger than window size."
+        raise ValueError("Input vector needs to be bigger than window size.")
 
     if window_len < 3:
         return x
 
     if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-        raise ValueError, "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'"
+        raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
 
     s = np.r_[x[window_len - 1:0:-1], x, x[-2:-window_len - 1:-1]]
     # print(len(s))
@@ -902,6 +945,15 @@ def pts_in_polygon(xy, polygon):
     return xy_out
 
 
+def pts_outside_polygon(xy, polygon):
+    """Returns points in array xy that are located inside supplied polygon array.
+    """
+    bpath = mplpath.Path(polygon)
+    outside = np.logical_not(bpath.contains_points(xy))
+    xy_out = xy[outside, :]
+    return xy_out
+
+
 def inds_in_polygon(xy, polygon):
     """Returns points in array xy that are located inside supplied polygon array.
     """
@@ -909,6 +961,65 @@ def inds_in_polygon(xy, polygon):
     inside = bpath.contains_points(xy)
     inds = np.where(inside)[0]
     return inds
+
+
+def polygons_enclosing_pt(pt, polygons):
+    """Returns points in array xy that are located inside supplied polygon array.
+
+    Parameters
+    ----------
+    pt : 2 x 1 float array
+        the point which we consider
+    polygons : list of #vertices x 2 float arrays
+        The vertices of the polygons to consider.
+
+    Returns
+    -------
+    inds : list of ints
+        The indices of polygons of the polygons which enclose pt
+    """
+    inds = []
+    ind = 0
+    for polygon in polygons:
+        bpath = mplpath.Path(polygon)
+        inside = bpath.contains_points(pt)
+        encloses = np.where(inside)[0]
+        if encloses:
+            inds.append(ind)
+        ind += 1
+    return inds
+
+
+def generate_random_xy_in_polygon(npts, polygon, sorted=False):
+    """Generate random xy values inside a polygon (in order, for example, to get kx, ky inside Brillouin zone)
+    Often searched for as generate_pts_in_polygon().
+
+    Parameters
+    ----------
+    npts :
+    polygon :
+    sorted : bool
+        sort the output by y value
+
+    Returns
+    -------
+
+    """
+    scale = max(np.max(polygon[:, 0]) - np.min(polygon[:, 0]), np.max(polygon[:, 1]) - np.min(polygon[:, 1]))
+    cxy = np.mean(polygon, axis=0)
+    xy0 = scale * (np.random.rand(npts, 2) - 0.5) + cxy
+    xyout = pts_in_polygon(xy0, polygon)
+
+    while np.shape(xyout)[0] < npts:
+        np_new = npts - np.shape(xyout)[0] + 10
+        xyadd = scale * (np.random.rand(np_new, 2) - 0.5) + cxy
+        xyadd = pts_in_polygon(xyadd, polygon)
+        xyout = np.vstack((xyout, xyadd))
+
+    if sorted:
+        xyout = xyout[xyout[:, 1].argsort()]
+
+    return xyout[0:npts]
 
 
 def polygons_enclosing_pt(pt, polygons):
@@ -1243,6 +1354,119 @@ def removekey(d, key):
     return r
 
 
+def savgol_filter(x, window_length, polyorder, deriv=0, delta=1.0, axis=-1, mode='interp', cval=0.0):
+    """ Apply a Savitzky-Golay filter to an array.
+    This is a 1-d filter.  If `x`  has dimension greater than 1, `axis`
+    determines the axis along which the filter is applied.
+    Parameters
+    ----------
+    x : array_like
+        The data to be filtered.  If `x` is not a single or double precision
+        floating point array, it will be converted to type `numpy.float64`
+        before filtering.
+    window_length : int
+        The length of the filter window (i.e. the number of coefficients).
+        `window_length` must be a positive odd integer. If `mode` is 'interp',
+        `window_length` must be less than or equal to the size of `x`.
+    polyorder : int
+        The order of the polynomial used to fit the samples.
+        `polyorder` must be less than `window_length`.
+    deriv : int, optional
+        The order of the derivative to compute.  This must be a
+        nonnegative integer.  The default is 0, which means to filter
+        the data without differentiating.
+    delta : float, optional
+        The spacing of the samples to which the filter will be applied.
+        This is only used if deriv > 0.  Default is 1.0.
+    axis : int, optional
+        The axis of the array `x` along which the filter is to be applied.
+        Default is -1.
+    mode : str, optional
+        Must be 'mirror', 'constant', 'nearest', 'wrap' or 'interp'.  This
+        determines the type of extension to use for the padded signal to
+        which the filter is applied.  When `mode` is 'constant', the padding
+        value is given by `cval`.  See the Notes for more details on 'mirror',
+        'constant', 'wrap', and 'nearest'.
+        When the 'interp' mode is selected (the default), no extension
+        is used.  Instead, a degree `polyorder` polynomial is fit to the
+        last `window_length` values of the edges, and this polynomial is
+        used to evaluate the last `window_length // 2` output values.
+    cval : scalar, optional
+        Value to fill past the edges of the input if `mode` is 'constant'.
+        Default is 0.0.
+    Returns
+    -------
+    y : ndarray, same shape as `x`
+        The filtered data.
+    See Also
+    --------
+    savgol_coeffs
+    Notes
+    -----
+    Details on the `mode` options:
+        'mirror':
+            Repeats the values at the edges in reverse order.  The value
+            closest to the edge is not included.
+        'nearest':
+            The extension contains the nearest input value.
+        'constant':
+            The extension contains the value given by the `cval` argument.
+        'wrap':
+            The extension contains the values from the other end of the array.
+    For example, if the input is [1, 2, 3, 4, 5, 6, 7, 8], and
+    `window_length` is 7, the following shows the extended data for
+    the various `mode` options (assuming `cval` is 0)::
+        mode       |   Ext   |         Input          |   Ext
+        -----------+---------+------------------------+---------
+        'mirror'   | 4  3  2 | 1  2  3  4  5  6  7  8 | 7  6  5
+        'nearest'  | 1  1  1 | 1  2  3  4  5  6  7  8 | 8  8  8
+        'constant' | 0  0  0 | 1  2  3  4  5  6  7  8 | 0  0  0
+        'wrap'     | 6  7  8 | 1  2  3  4  5  6  7  8 | 1  2  3
+    .. versionadded:: 0.14.0
+    Examples
+    --------
+    >>> from scipy.signal import savgol_filter
+    >>> np.set_printoptions(precision=2)  # For compact display.
+    >>> x = np.array([2, 2, 5, 2, 1, 0, 1, 4, 9])
+    Filter with a window length of 5 and a degree 2 polynomial.  Use
+    the defaults for all other parameters.
+    >>> savgol_filter(x, 5, 2)
+    array([ 1.66,  3.17,  3.54,  2.86,  0.66,  0.17,  1.  ,  4.  ,  9.  ])
+    Note that the last five values in x are samples of a parabola, so
+    when mode='interp' (the default) is used with polyorder=2, the last
+    three values are unchanged.  Compare that to, for example,
+    `mode='nearest'`:
+    >>> savgol_filter(x, 5, 2, mode='nearest')
+    array([ 1.74,  3.03,  3.54,  2.86,  0.66,  0.17,  1.  ,  4.6 ,  7.97])
+    """
+    if mode not in ["mirror", "constant", "nearest", "interp", "wrap"]:
+        raise ValueError("mode must be 'mirror', 'constant', 'nearest' "
+                         "'wrap' or 'interp'.")
+
+    x = np.asarray(x)
+    # Ensure that x is either single or double precision floating point.
+    if x.dtype != np.float64 and x.dtype != np.float32:
+        x = x.astype(np.float64)
+
+    coeffs = savgol_coeffs(window_length, polyorder, deriv=deriv, delta=delta)
+
+    if mode == "interp":
+        if window_length > x.size:
+            raise ValueError("If mode is 'interp', window_length must be less "
+                             "than or equal to the size of x.")
+
+        # Do not pad.  Instead, for the elements within `window_length // 2`
+        # of the ends of the sequence, use the polynomial that is fitted to
+        # the last `window_length` elements.
+        y = convolve1d(x, coeffs, axis=axis, mode="constant")
+        _fit_edges_polyfit(x, window_length, polyorder, deriv, delta, axis, y)
+    else:
+        # Any mode other than 'interp' is passed on to ndimage.convolve1d.
+        y = convolve1d(x, coeffs, axis=axis, mode=mode, cval=cval)
+
+    return y
+
+
 if __name__ == '__main__':
     from lepm.build.roipoly import RoiPoly
     import matplotlib.pyplot as plt
@@ -1259,8 +1483,6 @@ if __name__ == '__main__':
             polygon = RoiPoly(fig=fig, ax=ax, roicolor='r')
             maskrois.append(np.dstack((polygon.allxpoints, polygon.allypoints))[0])
 
-        print 'maskrois = ', maskrois
-        print 'maskrois[0] = ', maskrois[0]
         mask = gridpts_in_polygons(xgrid, ygrid, maskrois)
         plt.imshow(mask, interpolation='nearest')
         plt.savefig('/Users/npmitchell/Desktop/test.png')
@@ -1270,8 +1492,8 @@ if __name__ == '__main__':
         arr[0, 3] = np.nan
         arr[6, 4] = np.nan
         mask = np.isnan(arr)
-        print 'np.flatnonzero(mask) = ', np.flatnonzero(mask)
+        # print 'np.flatnonzero(mask) = ', np.flatnonzero(mask)
         arr = fill_nans_with_interpolation(arr)
-        print 'arr = ', arr
+        # print 'arr = ', arr
         plt.imshow(arr)
         plt.show()

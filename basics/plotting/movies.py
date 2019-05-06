@@ -1,11 +1,10 @@
 import matplotlib.pyplot as plt
 import subprocess
 import numpy as np
-import lepm.dataio as dio
-import lepm.stringformat as sf
-import plotting as leplt
+import basics.dataio as dio
+import basics.stringformat as sf
+import basics.plotting.plotting as leplt
 import glob
-import lepm.plotting.haldane_lattice_plotting_functions as hlatpfns
 
 
 def make_movie(imgname, movname, indexsz='05', framerate=10, imgdir=None, rm_images=False, save_into_subdir=False):
@@ -44,15 +43,15 @@ def make_movie(imgname, movname, indexsz='05', framerate=10, imgdir=None, rm_ima
     call_list = ['./ffmpeg', '-framerate', str(int(framerate)), '-i', imgname + '%' + indexsz + 'd.png',
                  movname, '-vcodec', 'libx264', '-profile:v', 'main', '-crf', '12', '-threads', '0',
                  '-r', '100', '-pix_fmt', 'yuv420p']
-    print 'calling: ', call_list
+    print('calling: ', call_list)
     subprocess.call(call_list)
 
     # Delete the original images
     if rm_images:
-        print 'Deleting the original images...'
+        print('Deleting the original images...')
         if save_into_subdir and imgdir is not None:
-            print 'Deleting folder ' + imgdir
+            print('Deleting folder ' + imgdir)
             subprocess.call(['rm', '-r', imgdir])
         else:
-            print 'Deleting folder contents ' + imgname + '*.png'
+            print('Deleting folder contents ' + imgname + '*.png')
             subprocess.call(['rm', imgname + '*.png'])
