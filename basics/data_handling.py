@@ -143,7 +143,7 @@ def bin_avg_minmaxstd(arr, bincol=0, tol=1e-7):
     return binv, avgs, mins, maxs, stds
 
 
-def bin_avg_minmaxstdcount(arr, bincol=0, tol=1e-7):
+def bin_avg_minmaxstdcount(arr, bincol=0, tol=1e-7, eps=None, dx=None):
     """Get averages of data in an array, where one column denotes some number that is used to bin the rows of arr.
     Bin values of arr[:, bincol], use their digitization to group the rows of arr. Then take averages and look at
     statistics of those groups of data.
@@ -156,6 +156,8 @@ def bin_avg_minmaxstdcount(arr, bincol=0, tol=1e-7):
         the column which will be used to group entries in arr into bins
     tol : float
         The allowable difference between elements to put them into the same bin
+    dx : float or None
+        The minimum difference between elements to be binned.
 
     Returns
     -------
@@ -174,10 +176,14 @@ def bin_avg_minmaxstdcount(arr, bincol=0, tol=1e-7):
     othercols = [x for x in range(len(arr[0, :])) if x != np.mod(bincol, len(arr[0, :]))]
     minbc = np.min(abc)
     maxbc = np.max(abc)
+
     # create a very small number to ensure that bin ranges enclose the values in abc
-    eps = 1e-7 * np.min(np.abs(abc[np.nonzero(abc)[0]]))
-    diffs = np.abs(diff_matrix(abc, abc).ravel())
-    dx = np.min(diffs[np.where(diffs > tol)[0]])
+    if eps is None:
+        eps = 1e-7 * np.min(np.abs(abc[np.nonzero(abc)[0]]))
+
+    if dx is None:
+        diffs = np.abs(diff_matrix(abc, abc).ravel())
+        dx = np.min(diffs[np.where(diffs > tol)[0]])
 
     nbc = (maxbc - minbc) / dx + 2
     bins = np.linspace(minbc - eps, maxbc + eps, nbc)
@@ -206,6 +212,58 @@ def bin_avg_minmaxstdcount(arr, bincol=0, tol=1e-7):
         kk += 1
 
     return binv, avgs, mins, maxs, stds, count
+
+
+def common_member(a, b):
+    """Check if two 1d arrays/lists/tuples have a common row
+
+    Parameters
+    ----------
+    a : array or list or tuple
+        The first object, to test if it shares a member with b
+    b : array or list or tuple
+        The second object, to test if it shares a member with a
+
+    Returns
+    -------
+    common_member: bool
+        Whether the two inputs share a common member
+    """
+    a_set = set(a)
+    b_set = set(b)
+    if len(a_set.intersection(b_set)) > 0:
+        return(True)
+    return(False)
+
+
+def argwhere_share_row(a, b):
+    """Find the indices of where two arrays share a row.
+
+    Parameters
+    ----------
+    a : n x m array
+    b : p x q array
+
+    Returns
+    -------
+    common : dict with int keys and list values
+        Keys are indices of a that are rows in a, values are indices of b that share the keyed row of a
+        
+    Examples
+    --------
+    a = np.array([[1,2.3],[1,1.1]])
+    b = np.array([[0,0],[0,1],[1,2.3]])
+    common = argwhere_share_row(a,b)
+    """
+    common = {}
+    for (row, kk) in zip(a, range(np.shape(a)[0])):
+        # To check if there is a shared row at all, do this:
+        # reference: https://stackoverflow.com/questions/14766194/testing-whether-a-numpy-array-contains-a-given-row
+        # any(np.equal(a, row).all(1))
+        inds = np.argwhere(np.equal(b, row).all(1))
+        if len(inds) > 0:
+            common[kk] = inds[0].tolist()
+    return common
 
 
 def binstats_extravariable(arr, bin0col=0, bin1col=1, tol=1e-7):
@@ -1086,12 +1144,12 @@ def dist_pts(pts, nbrs, dim=-1, square_norm=False):
 
     Parameters
     ----------
-    pts: N x 2 array (float or int)
+    pts: N x d array (float or int)
         points to measure distances from
-    nbrs: M x 2 array (float or int)
+    nbrs: M x d array (float or int)
         points to measure distances to
     dim: int (default -1)
-        dimension along which to measure distance. Default is -1, which measures the Euclidean distance in 2D
+        dimension along which to measure distance. Default is -1, which measures the Euclidean distance in d-Dimensions
     square_norm: bool
         Abstain from taking square root, so that if dim==-1, returns the square norm (distance squared).
 
@@ -1100,27 +1158,31 @@ def dist_pts(pts, nbrs, dim=-1, square_norm=False):
     dist : N x M float array
         i,jth element is distance between pts[i] and nbrs[j], along dimension specified (default is normed distance)
     """
+    if np.shape(pts)[1] != np.shape(nbrs)[1]:
+        raise RuntimeError('Supplied point clouds have different dimensionality.')
+
     if dim < 0.5:
-        Xarr = np.ones((len(pts), len(nbrs)), dtype=float) * nbrs[:, 0]
-        # Computing dist(x)
-        # gxy_x = np.array([gxy_Xarr[i] - xyip[i,0] for i in range(len(xyip)) ])
-        dist_x = Xarr - np.dstack(np.array([pts[:, 0].tolist()] * np.shape(Xarr)[1]))[0]
-    if np.abs(dim) > 0.5:
-        Yarr = np.ones((len(pts), len(nbrs)), dtype=float) * nbrs[:, 1]
-        # Computing dist(y)
-        # gxy_y = np.array([gxy_Yarr[i] - xyip[i,1] for i in range(len(xyip)) ])
-        dist_y = Yarr - np.dstack(np.array([pts[:, 1].tolist()] * np.shape(Yarr)[1]))[0]
-    if dim == -1:
-        dist = dist_x ** 2 + dist_y ** 2
+        dist_x = []
+        for dd in range(np.shape(pts)[1]):
+            Xarr = np.ones((np.shape(pts)[0], np.shape(nbrs)[0]), dtype=float) * nbrs[:, dd]
+            # Computing dist(x)
+            # gxy_x = np.array([gxy_Xarr[i] - xyip[i,0] for i in range(len(xyip)) ])
+            dist_x.append(Xarr - np.dstack(np.array([pts[:, dd].tolist()] * np.shape(Xarr)[1]))[0])
+
+        dist = np.zeros_like(dist_x[0])
+        for dis in dist_x:
+            dist += dis ** 2
+
         if not square_norm:
             dist = np.sqrt(dist)
         return dist
-    elif dim == 0:
-        if square_norm:
-            return dist_x ** 2
-        else:
-            return dist_x
-    elif dim == 1:
+
+    if dim > -0.5:
+        # just measure distance along a single axis.
+        Yarr = np.ones((len(pts), len(nbrs)), dtype=float) * nbrs[:, 1]
+        # Computing dist(y)
+        # gxy_y = np.array([gxy_Yarr[i] - xyip[i,1] for i in range(len(xyip)) ])
+        dist_y = Yarr - np.dstack(np.array([pts[:, dim].tolist()] * np.shape(Yarr)[1]))[0]
         if square_norm:
             return dist_y ** 2
         else:
@@ -1257,15 +1319,80 @@ def dist_pts_along_vec(pts, nbrs, vec):
     return dist_alongv
 
 
+def order_curve(curve, ind0=0, method='nearest'):
+    """
+
+    Parameters
+    ----------
+    curve : N x d float list or array
+        A collection of (unordered) points to be ordered
+    ind0 : int
+        Index of the starting point of the curve
+    method : str (nearest or projected)
+        Nearest orders the points by whichever is nearest (fast and dirty)
+        Projected orders the points using a directed distance vector, so that the next point pt_{i+1} has positive
+        projection onto the vector pt_{i} - pt_{i-1}
+
+    Returns
+    -------
+    
+    """
+    # free = np.ones(len(sk[:, 0]), type=bool)
+    # free[ind0] = False
+    # while free.any():
+    #    ind = dh.closest_point(sk[free, :])
+    #    Use cumulative sum to get the index of the curve
+    #    np.cumsum(not free)
+    #    free[ind] = False
+    if not isinstance(curve, list):
+        curve = curve.tolist()
+
+    pass_by = copy.deepcopy(curve)
+    indices = np.arange(len(pass_by))
+    path, inds = [curve[ind0]], [ind0]
+    pass_by.remove(curve[ind0])
+    # Turn curve back into numpy array
+    curve = np.array(curve)
+    while pass_by:
+        if method == 'nearest':
+            # Note: min() passes the arguments to the key function & returns smallest among the arguments based on the
+            # return value of the key function.
+            # Compute distances of available points from last point 
+            dists = np.sum((np.array(pass_by) - np.array(path[-1])) ** 2, axis=1)
+            # Find the nearest index of the available in pass_by
+            pbinds = np.arange(len(pass_by))
+            pbind = min(pbinds, key=lambda x: dists[x])
+            # Get the nearest point indexed via above
+            nearest = pass_by[pbind]
+            # Get the index of the original input associated with this point
+            ind = min(indices, key=lambda x: np.sum((curve[x] - np.array([nearest])) ** 2, axis=1))
+        elif method == 'projected':
+            raise RuntimeError('Have not coded for this case yet. Do this.')
+        else:
+            raise RuntimeError('Have not coded for this case yet. Do this.')
+
+        path.append(nearest)
+        inds.append(ind)
+        pass_by.remove(nearest)
+
+    # raise RuntimeError
+    return path, inds
+
+
 def closest_point(pt, xy):
     """Find the index of the point closest to the supplied single point pt
 
     Parameters
     ----------
-    pt : 1 x 2 float array
+    pt : 1 x d float array
         A single xy point
-    xy : N x 2 float array or list
+    xy : N x d float array or list
         the coordinates of the points to compare pt to
+
+    Returns
+    -------
+    ind : int
+        the integer index of xy whose point is closest to pt
     """
     xy = np.asarray(xy)
     dist_2 = np.sum((xy - pt) ** 2, axis=1)
@@ -1468,8 +1595,12 @@ def savgol_filter(x, window_length, polyorder, deriv=0, delta=1.0, axis=-1, mode
 
 
 if __name__ == '__main__':
-    from lepm.build.roipoly import RoiPoly
+    # from lepm.build.roipoly import RoiPoly
     import matplotlib.pyplot as plt
+
+    x = np.array([[0, 0], [0, 1], [1, 1], [1, 2], [3, 3]])
+    dist = dist_pts(x, x)
+    print('dist = ', dist)
 
     # demonstrate gridpts_in_polygons()
     if False:
@@ -1487,7 +1618,7 @@ if __name__ == '__main__':
         plt.imshow(mask, interpolation='nearest')
         plt.savefig('/Users/npmitchell/Desktop/test.png')
 
-    if True:
+    if False:
         arr = np.random.rand(10, 10)
         arr[0, 3] = np.nan
         arr[6, 4] = np.nan

@@ -10,7 +10,7 @@ Look recursively for any dictionary contained
 # ############# Generating and Writing ####################
 
 
-def save(filename, ddict):
+def save(filename, ddict, key=None):
     """
 
     Parameters
@@ -22,37 +22,43 @@ def save(filename, ddict):
     -------
 
     """
-    filename = filename + '.hdf5'
+    if filename[-5:] != '.hdf5' and filename[-3:] != '.h5':
+        filename = filename + '.hdf5'
+
     f, b = create(filename)
     if b:
-        write_rec(f, ddict, key='U')
+        write_rec(f, ddict, key=key)
     else:
         print(filename + ' cannot be saved')
 
+    return f
 
-def create(filename):
+def create(filename, overwrite=False):
     # filename = file_architecture.os_i(filename)
     if not os.path.exists(filename):
         print(filename)
         f = h5py.File(filename, 'w')
         return f, True
     else:
-        print("File " + filename + " already exists, skip ")
-        return None, False
+        if overwrite:
+            f = h5py.File(filename, 'w')
+            return f, True
+        else:
+            print("File " + filename + " already exists, skip ")
+            return None, False
 
 
-def write(obj, erase=False, filename=None, key=''):
-    """
-    Write into a hdf5 file all the parameters recursively
+def write(obj, overwrite=False, filename=None, key=''):
+    """Write into a hdf5 file all the parameters recursively
     hdf5 file contains a dictionary for each Class instance (e.g. Sdata, param, id) the parameters
     each individual is a dictionary containing the attributes of the class + '__module__' and '__doc__'
 
     Parameters
     ----------
     obj : Class instance 
-        to be writen in json file. Attribute can be any type, numpy array are replaced by List.
-    erase : bool, default False
-        erase numpy array data before writing the json file. Prevent large json files
+        to be writen in hdf5 file. Attribute can be any type, numpy array are replaced by List.
+    overwrite : bool, default False
+        Overwrite previous file/data
     filename : str or None
     key : str
 
@@ -61,21 +67,31 @@ def write(obj, erase=False, filename=None, key=''):
     None
     
     """
-
     # dict_total = get_attr_rec({},obj,[])
     dict_total = {}
     if filename is None:
         filename = os.path.dirname(obj.Sdata.fileCine) + '/hdf5/test' + '.hdf5'
 
-    f, do = create(filename)
+    f, do = create(filename, overwrite=overwrite)
     if do:
-        write_rec(f, dict_total, key=key)
+        write_rec(f, obj, key=key)
         f.close()
+    else:
+        raise RuntimeError('Could not create file: ' + filename)
 
 
 def write_rec(f, ddict, key='', grp=None, group=None, t=0, tmax=3):
-    """
-    Write recursively a dictionary into a h5py previously open file (f)
+    """Write recursively a dictionary into a h5py previously open file (f)
+
+    Parameters
+    ----------
+    f :
+    ddict :
+    key : str
+    grp : or None
+    group : or None
+    t : int
+    tmax : int
     """
     done = False
     if type(ddict) == dict:
@@ -84,7 +100,7 @@ def write_rec(f, ddict, key='', grp=None, group=None, t=0, tmax=3):
 
         if group is None:
             group = key
-        #    grp = f.create_group(group)
+            # grp = f.create_group(group)
         else:
             #            if 'object' in :
             group = group + '/' + key
@@ -94,7 +110,8 @@ def write_rec(f, ddict, key='', grp=None, group=None, t=0, tmax=3):
             grp = f.create_group(group)
         else:
             grp = f[group]
-        #        print(ddict.keys())
+            # print(ddict.keys())
+        
         for key in ddict.keys():
             if t < tmax:  # limit the number of recursion to 2 : protection against overflow
                 write_rec(f, ddict[key], key=key, group=group, grp=grp, t=t + 1)
@@ -105,7 +122,11 @@ def write_rec(f, ddict, key='', grp=None, group=None, t=0, tmax=3):
 
     if type(ddict) in [np.ndarray]:
         done = True
-        dataname = group + '/' + key
+        if group is not None:
+            dataname = group + '/' + key
+        else:
+            dataname = key
+
         if dataname not in f:
             dset = f.create_dataset(dataname, data=ddict, chunks=True)  # ddict.shape, dtype=ddict.dtype)
         else:
@@ -115,11 +136,12 @@ def write_rec(f, ddict, key='', grp=None, group=None, t=0, tmax=3):
         done = True
         # print(key)
         grp.attrs[key] = ddict
+
     if not done:
         print("Unrecognized : " + str(key) + ' of type ' + str(type(ddict)))
 
-# ############## Open and load ###########
 
+# ############## Open and load ###########
 
 def h5open(filename, typ='r'):
     """
