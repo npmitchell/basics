@@ -176,8 +176,6 @@ def load_dset(fn, dset_name):
     """
     f = h5py.File(fn, 'r')
     dset = f[dset_name][:]
-    print('loaded dset: ')
-    print(dset)
     f.close()
     return dset
 
