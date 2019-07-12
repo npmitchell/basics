@@ -33,6 +33,7 @@ def save(filename, ddict, key=None):
 
     return f
 
+
 def create(filename, overwrite=False):
     # filename = file_architecture.os_i(filename)
     if not os.path.exists(filename):
@@ -156,8 +157,30 @@ def h5open(filename, typ='r'):
         f = h5py.File(filename, 'w')
     return f
 
-
 # print('done')
+
+def load_dset(fn, dset_name):
+    """
+
+    Parameters
+    ----------
+    fn : str
+        the HDF5 file to load a dataset from
+    dset_name : str
+        the name of the dataset to load in the hdf5 file fn
+    
+    Returns
+    -------
+    dset : npy array
+        
+    """
+    f = h5py.File(fn, 'r')
+    dset = f[dset_name][:]
+    print('loaded dset: ')
+    print(dset)
+    f.close()
+    return dset
+
 
 def load_dict(data, ans={}):
     """Transform a h5py group into a dictionary recursively.
@@ -169,7 +192,10 @@ def load_dict(data, ans={}):
 
     Returns
     -------
+    ans : dict
 
+    Examples
+    --------
     """
     for key, item in data.attrs.items():
         ans[key] = item
