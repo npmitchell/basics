@@ -274,6 +274,8 @@ def hex2rgb(triplet):
     rgb : 3-tuple
         Red, green, and blue values between 0 and 255
     """
+    if triplet[0] == '#':
+        triplet = triplet[1:]
     return _HEXDEC[triplet[0:2]], _HEXDEC[triplet[2:4]], _HEXDEC[triplet[4:6]]
 
 
