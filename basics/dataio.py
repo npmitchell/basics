@@ -91,10 +91,7 @@ def prepdir(dir):
     dir : string
         the directory path, ending with '/'
     """
-    if dir[-1] == '/':
-        return dir
-    else:
-        return dir + '/'
+    return os.path.join(dir, '')
 
 
 def find_subdirs(string, maindir):

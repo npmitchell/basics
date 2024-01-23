@@ -157,7 +157,6 @@ def h5open(filename, typ='r'):
         f = h5py.File(filename, 'w')
     return f
 
-# print('done')
 
 def load_dset(fn, dset_name):
     """

@@ -1,10 +1,8 @@
-import matplotlib.pyplot as plt
 import subprocess
-import numpy as np
-import basics.dataio as dio
-import basics.stringformat as sf
-import basics.plotting.plotting as leplt
-import glob
+
+"""
+Movie making module
+"""
 
 
 def make_movie(imgname, movname, indexsz='05', framerate=10, imgdir=None, rm_images=False, save_into_subdir=False):

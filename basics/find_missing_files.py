@@ -13,6 +13,9 @@ python /mnt/data/code/basics/basics/find_missing_files.py -fn \
     Time_wildcard_Angle_0_c1_ls_1.ome.tif -start 0 -end 209 -padding 6
 
 python /mnt/data/code/basics/basics/find_missing_files.py -fn \
+    deconvolved_32bit_4view_thres0p140_pix2_sig15_affinereg_individual_registration/TPwildcard_Ch0_Ill0_Ang0,45,90,135,180,225,270,315.tif -start 0 -end 209 
+
+python /mnt/data/code/basics/basics/find_missing_files.py -fn \
     Time_wildcard_c1.tif -start 0 -end 209 -padding 6
     
 """

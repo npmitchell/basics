@@ -1,16 +1,8 @@
-# note cyclic import: cannot use from... syntax, here it just imports an empty module lattice_elasticity,
-# but when called down below, it will find what it needs
-import weakref
 import basics.plotting.colormaps as lecmaps
-from matplotlib.patches import Circle, Wedge, Polygon, Rectangle
-from matplotlib.collections import LineCollection
-from matplotlib.collections import PatchCollection
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.cm
 import basics.plotting.science_plot_style as sps
-from mpl_toolkits.axes_grid1 import AxesGrid
-import sys
 
 """General functions for plotting"""
 

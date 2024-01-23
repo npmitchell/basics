@@ -13,10 +13,12 @@ python rename_files.py -oldstr textfile -newstr nicefile -dir ./directory_to_cha
 python rename_files.py -oldstr textfile -newstr nicefile -dir /Users/labuser/directory_to_change
 python rename_files.py -oldstr textfile -newstr nicefile -dir /Users/labuser/directory_to_change/
 python rename_files.py -oldstr textfile -newstr nicefile -dir ./directory_to_change/,./other_dir_to_change/
+python rename_files.py -oldstr msls_apical_0 -newstr msls_apical_stab_0 -dir /mnt/crunch/48Ygal4-UAShistRFP/201904031830_great/Time4views_60sec_1p4um_25x_1p0mW_exp0p35_2/data/deconvolved_16bit/msls_output_prnun5_prs1_nu0p00_s0p10_pn2_ps4_l1_l1/
 
 Will NOT work:
 python rename_files.py -oldstr textfile -newstr nicefile -dir ../directory_to_change/
 python rename_files.py -oldstr textfile -newstr nicefile -dir ../../directory_to_change/
+
 '''
 
 
@@ -38,24 +40,24 @@ def rename_files(directory, oldstr, newstr):
     if directory[-1] != '/':
         directory += '/'
 
-    print "The directory is: %s" % directory
-    print "The files to be replaced are is: %s" % glob.glob(directory + '*' + oldstr + '*')
+    print("The directory is: %s" % directory)
+    print("The files to be replaced are is: %s" % glob.glob(directory + '*' + oldstr + '*'))
 
     # Note below we avoid overwritting THIS file
     # (which could be changed if looking in our present working directory).
     for filename in glob.glob(directory + '*' + args.oldstr + '*'):
         if not filename == 'rename_files.py':
-            print 'filename = ', filename
+            print('filename = ', filename)
             # renaming files in directory
             if args.oldstr in filename:
                 newname = filename.split(oldstr)[0] + newstr + filename.split(oldstr)[1]
                 os.rename(filename, newname)
-                print 'new filename = ', newname
+                print('new filename = ', newname)
 
-    print "Successfully renamed."
+    print("Successfully renamed.")
 
     # listing directories after renaming "tutorialsdir"
-    print "the dir now contains: %s" % os.listdir(directory)
+    print("the dir now contains: %s" % os.listdir(directory))
 
 
 if __name__ == '__main__':

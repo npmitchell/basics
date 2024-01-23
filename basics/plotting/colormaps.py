@@ -1980,13 +1980,16 @@ def orange():
     """Return a pleasing shade of orange in hexadecimal"""
     return '#FF7F0E'
 
+
 def orange_default():
     """Return the default shade of orange in hexadecimal"""
     return '#FD690F'
 
+
 def light_orange():
     """Return a brighter, less saturated version of orange_default(), which is FD690F"""
     return '#FFCA94'
+
 
 def honey():
     """Return a soft shade of yellowish brown in hexadecimal"""
@@ -2026,3 +2029,13 @@ def light_light_gray():
 def white():
     """Return the hexcolor white"""
     return '#FFFFFF'
+
+
+def cyan():
+    """Return the hexcolor cyan"""
+    return '#00FFFF'
+
+
+def magenta():
+    """Return the hexcolor magenta"""
+    return '#FF00FF'
